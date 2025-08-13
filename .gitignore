@@ -1,0 +1,38 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.pyc
+
+# Entornos virtuales
+.venv/
+venv/
+ENV/
+
+# VSCode
+.vscode/
+
+# Archivos de configuración de entorno
+.env
+.env.*
+
+# Archivos de Supabase
+.supabase/
+
+# Archivos de bases de datos locales
+*.db
+*.sqlite3
+
+# Archivos de logs
+*.log
+
+# Archivos de Jupyter
+.ipynb_checkpoints/
+
+# Otros
+.DS_Store
+*.swp
+
+# Node/npm (por si usas alguna integración JS)
+node_modules/
