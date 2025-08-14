@@ -1,4 +1,4 @@
-ISOBANK Bank Agent — README
+# ISOBANK Bank Agent — README
 
 Agente conversacional bancario para ISOBANK con orquestación de tools, RAG (Pinecone) para FAQs, persistencia de historial en Supabase y máscara de datos sensibles.
 
