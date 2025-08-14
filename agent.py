@@ -114,10 +114,14 @@ def ejecutar_tool(nombre_funcion, parametros):
 
 def obtener_historial(limit=10):
     # Obtiene los últimos 'limit' mensajes ordenados por timestamp ascendente
-    res = supabase.table("historial").select("role,content,timestamp").order("timestamp", desc=False).limit(limit).execute()
-    if hasattr(res, 'data'):
-        return res.data
-    return []
+    try:
+        res = supabase.table("historial").select("role,content,timestamp").order("timestamp", desc=False).limit(limit).execute()
+        if hasattr(res, 'data'):
+            return res.data
+        return []
+    except Exception:
+        print("Lo sentimos, no pudimos recuperar el historial. Inténtalo más tarde.")
+        return []
 
 def guardar_historial(role, content):
     data = {
@@ -125,8 +129,12 @@ def guardar_historial(role, content):
         "content": content,
         "timestamp": datetime.datetime.utcnow().isoformat()
     }
-    res = supabase.table("historial").insert(data).execute()
-    return res
+    try:
+        res = supabase.table("historial").insert(data).execute()
+        return res
+    except Exception:
+        print("Lo sentimos, no pudimos guardar el historial. Inténtalo más tarde.")
+        return None
 
 
 app = Flask(__name__)
@@ -310,7 +318,10 @@ Reglas críticas (no romper)
                     nombre_funcion = tool_call.function.name
                     parametros = tool_call.function.arguments
                     parametros_dict = json.loads(parametros)
-                    resultado = ejecutar_tool(nombre_funcion, parametros_dict)
+                    try:
+                        resultado = ejecutar_tool(nombre_funcion, parametros_dict)
+                    except Exception:
+                        resultado = {"error": "Lo sentimos, no pudimos procesar tu solicitud. Inténtalo más tarde."}
                     followup_messages.append({
                         "role": "tool",
                         "tool_call_id": tool_call.id,
@@ -327,22 +338,21 @@ Reglas críticas (no romper)
                     guardar_historial("user", user_message)
                     guardar_historial("assistant", final_answer)
                     print(f"Agente: {final_answer}")
-                except Exception as e:
+                except Exception:
                     guardar_historial("user", user_message)
-                    guardar_historial("assistant", str(followup_messages))
-                    print(f"Agente (tools): {followup_messages}")
-                    print(f"Error procesando respuesta final: {e}")
+                    guardar_historial("assistant", "Lo sentimos, no pudimos procesar tu solicitud. Inténtalo más tarde.")
+                    print("Agente: Lo sentimos, no pudimos procesar tu solicitud. Inténtalo más tarde.")
             else:
                 answer = choice.message.content
                 guardar_historial("user", user_message)
                 guardar_historial("assistant", answer)
                 print(f"Agente: {answer}")
-        except Exception as e:
-            print(f"Error: {e}")
+        except Exception:
+            print("Agente: Lo sentimos, no pudimos procesar tu solicitud. Inténtalo más tarde.")
 
 if __name__ == '__main__':
     
     if len(sys.argv) > 1 and sys.argv[1] == "terminal":
         chat_terminal()
     else:
-        app.run(host='0.0.0.0', port=3000)
+        print("Lo sentimos. Para poder ejecutar programa, debe ejecutar python agent.py terminal")
