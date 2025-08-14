@@ -87,7 +87,7 @@ Modo API HTTP (servidor Flask)
 # Importante: Levantar el archivo api.py.
 
 python api.py
-levanta en http://0.0.0.0:3000
+
 
 🧠 System Prompt (resumen de comportamiento)
 
