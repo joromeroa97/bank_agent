@@ -2,7 +2,7 @@
 
 Agente conversacional bancario para ISOBANK con orquestación de tools, RAG (Pinecone) para FAQs, persistencia de historial en Supabase y máscara de datos sensibles.
 
-🚀 Resumen
+# 🚀 Resumen
 
 Este proyecto implementa un asistente bancario virtual que:
 
@@ -14,7 +14,7 @@ Persiste el historial de conversación en Supabase.
 
 Aplica reglas estrictas de validación de cédula (10 dígitos) y enmascarado de números sensibles (cuentas/tarjetas: * + últimos 4).
 
-🧰 Tools disponibles
+# 🧰 Tools disponibles
 
 consultar_cuentas(cedula: string)
 
@@ -28,7 +28,7 @@ consultar_faq(pregunta: string) → RAG en Pinecone
 
 El orquestador enruta las tool calls en ejecutar_tool(nombre_funcion, parametros).
 
-🔒 Reglas de seguridad y privacidad
+# 🔒 Reglas de seguridad y privacidad
 
 Validación de cédula: exactamente 10 dígitos numéricos.
 
@@ -44,7 +44,7 @@ No inventar datos: si una tool no retorna información, se responde con transpar
 
 Recomendado (no incluido por defecto): gating de autenticación/autorización antes de ejecutar tools.
 
-📦 Requisitos
+# 📦 Requisitos
 
 Python 3.10+
 
@@ -52,9 +52,9 @@ Dependencias (sugerido en requirements.txt):
 
 openai, flask, python-dotenv, supabase, pydantic (opcional), pinecone-client (según tu wrapper), requests
 
-⚙️ Configuración
+# ⚙️ Configuración
 
-# Crea un archivo .env en la raíz:
+Crea un archivo .env en la raíz:
 
 OPENAI_API_KEY=sk-...
 SUPABASE_URL=https://xxxxx.supabase.co
@@ -75,8 +75,8 @@ timestamp (text ISO-8601)
 
 Active RLS según tu estrategia. Evita guardar PII en claro.
 
-▶️ Ejecución
-# Modo Terminal (desarrollo)
+# ▶️ Ejecución
+Modo Terminal (desarrollo)
 python app.py terminal
 
 
@@ -89,7 +89,7 @@ Modo API HTTP (servidor Flask)
 python api.py
 
 
-🧠 System Prompt (resumen de comportamiento)
+# 🧠 System Prompt (resumen de comportamiento)
 
 Español neutro, trato de usted, profesional y conciso.
 
@@ -103,7 +103,7 @@ FAQs via Pinecone (RAG).
 
 No mencionar nombres de tools ni detalles técnicos.
 
-🧾 Formatos de respuesta (obligatorios)
+# 🧾 Formatos de respuesta (obligatorios)
 
 Cuentas bancarias:
 
@@ -122,7 +122,7 @@ Pólizas:
 Número: POL123456, Tipo: Vida, Vigencia: 2025-12-31
 (Si tu backend exige enmascarar el número de póliza, aplica el mismo criterio con * y últimos 4.)
 
-🧪 Pruebas rápidas (manual)
+# 🧪 Pruebas rápidas (manual)
 
 Cuentas (con cédula válida): debe listar enmascarado.
 
@@ -132,7 +132,7 @@ Pólizas: mismo patrón que tarjetas.
 
 FAQs: responde desde Pinecone sin exponer PII.
 
-👤 Autor / Contacto
+# 👤 Autor / Contacto
 
 Ing. Jandry Romero
 LinkedIn: https://www.linkedin.com/in/jandry-romero-arcentales-5b9836224/
