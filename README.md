@@ -54,12 +54,12 @@ openai, flask, python-dotenv, supabase, pydantic (opcional), pinecone-client (se
 
 ⚙️ Configuración
 
-Crea un archivo .env en la raíz:
+# Crea un archivo .env en la raíz:
 
 OPENAI_API_KEY=sk-...
 SUPABASE_URL=https://xxxxx.supabase.co
 SUPABASE_KEY=eyJhbGciOi...
-# Si tu módulo pinecone_tools lo requiere:
+Si tu módulo pinecone_tools lo requiere:
 PINECONE_API_KEY=...
 PINECONE_ENVIRONMENT=...   # o PINECONE_INDEX=...
 
@@ -76,7 +76,7 @@ timestamp (text ISO-8601)
 Active RLS según tu estrategia. Evita guardar PII en claro.
 
 ▶️ Ejecución
-Modo Terminal (desarrollo)
+# Modo Terminal (desarrollo)
 python app.py terminal
 
 
@@ -84,10 +84,10 @@ Verás: Bienvenidos a ISOBANK (escribe 'salir' para terminar).
 
 Modo API HTTP (servidor Flask)
 
-Importante: Levantar el archivo api.py.
+# Importante: Levantar el archivo api.py.
 
 python api.py
-# levanta en http://0.0.0.0:3000
+levanta en http://0.0.0.0:3000
 
 🧠 System Prompt (resumen de comportamiento)
 
