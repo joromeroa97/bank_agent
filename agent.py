@@ -1,21 +1,37 @@
+import pinecone_tools
+import json
 from dotenv import load_dotenv
-import os   # Importa dotenv para manejar variables de entorno
+import os
 from flask import Flask, request, jsonify
 import openai
 from supabase import create_client, Client
 import datetime
-import importlib.util
 import tools
+import sys
 
+load_dotenv()
 
-
-# Definición de las funciones para el modelo OpenAI function-calling
+# Definición de las funciones (tools) para el modelo de LLM.
 openai_tools = [
     {
         "type": "function",
         "function": {
+            "name": "consultar_faq",
+            "description": "Esta tool permite consultar una pregunta frecuente en la base vectorial Pinecone.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "pregunta": {"type": "string"}
+                },
+                "required": ["pregunta"]
+            }
+        }
+    },
+    {
+        "type": "function",
+        "function": {
             "name": "crear_cuenta",
-            "description": "Crea una cuenta bancaria para un cliente.",
+            "description": "Esta tool permite crear una cuenta bancaria para un cliente. Recibe como parametros el nombre, apellido y cédula del cliente.",
             "parameters": {
                 "type": "object",
                 "properties": {
@@ -31,7 +47,7 @@ openai_tools = [
         "type": "function",
         "function": {
             "name": "consultar_cuentas",
-            "description": "Consulta las cuentas bancarias de un cliente por cédula.",
+            "description": "Esta tool permite consultar las cuentas bancarias de un cliente. Recibe como parametro la cedula del cliente.",
             "parameters": {
                 "type": "object",
                 "properties": {
@@ -45,7 +61,7 @@ openai_tools = [
         "type": "function",
         "function": {
             "name": "consultar_tarjetas",
-            "description": "Consulta las tarjetas de crédito de un cliente por cédula y cuenta.",
+            "description": "Esta tool permite consultar las tarjetas de crédito de un cliente. Recibe como parametro una cuenta del cliente y su numero de cedula.",
             "parameters": {
                 "type": "object",
                 "properties": {
@@ -60,12 +76,13 @@ openai_tools = [
         "type": "function",
         "function": {
             "name": "consultar_polizas",
-            "description": "Consulta las pólizas de un cliente por cédula y cuenta.",
+            "description": "Esta tool permite consultar las pólizas de un cliente. Recibe obligatoriamente como parametro la cuenta del cliente, su tipo de poliza y su numero de cedula.",
             "parameters": {
                 "type": "object",
                 "properties": {
                     "cedula": {"type": "string"},
                     "cuenta": {"type": "string"}
+                    #"tipo": {"type": "string"}
                 },
                 "required": ["cedula", "cuenta"]
             }
@@ -73,13 +90,15 @@ openai_tools = [
     }
 ]
 
-SUPABASE_URL = "https://beebcoccbknhhltcfqif.supabase.co"
-SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJlZWJjb2NjYmtuaGhsdGNmcWlmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDgzODkzOTQsImV4cCI6MjA2Mzk2NTM5NH0.K7_cyK9e22a4OompbeZdZ7wE5sYdALxfJ8o2Rlv4O50"
+SUPABASE_URL = os.getenv("SUPABASE_URL")
+SUPABASE_KEY = os.getenv("SUPABASE_KEY")
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 
 
 # Lógica para ejecutar la tool adecuada según la función llamada
 def ejecutar_tool(nombre_funcion, parametros):
+    if nombre_funcion == "consultar_faq":
+        return pinecone_tools.tool_consultar_faq(parametros["pregunta"])
     if nombre_funcion == "crear_cuenta":
         return tools.tool_crear_cuenta(parametros["nombre"], parametros["apellido"], parametros["cedula"])
     elif nombre_funcion == "consultar_cuentas":
@@ -91,7 +110,7 @@ def ejecutar_tool(nombre_funcion, parametros):
     else:
         return {"error": "Función no soportada"}
 
-load_dotenv()
+
 
 def obtener_historial(limit=10):
     # Obtiene los últimos 'limit' mensajes ordenados por timestamp ascendente
@@ -115,130 +134,137 @@ app = Flask(__name__)
 # Configura tu API key de OpenAI desde variable de entorno
 client = openai.OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
-@app.route('/chat', methods=['POST'])
 
-
+# Funcion para iniciar el chat en terminal
 def chat_terminal():
     print("Bienvenidos a ISOBANK (escribe 'salir' para terminar)")
     system_prompt = """
-    ISOBANK — Asistente Bancario (System Prompt)
-Identidad y alcance
-Eres un asistente bancario profesional de ISOBANK. Solo ofreces y operas servicios de ISOBANK. No haces comparaciones con otros bancos ni ofreces servicios externos. No inventas datos.
+ISOBANK — Agente Bancario Virtual (System Prompt)
+Rol y alcance
 
-Tools disponibles (única fuente de verdad)
-Debes usar exclusivamente estas tools cuando corresponda y nunca mostrar sus nombres ni detalles técnicos al cliente:
+Eres un agente bancario virtual de ISOBANK. Respondes de forma profesional, amable y concisa. Solo ofreces servicios de ISOBANK. No inventes información ni expongas detalles técnicos al cliente.
 
-consultar_cuentas(cedula: string)
+Herramientas disponibles (internas)
 
-consultar_tarjetas(cedula: string, cuenta: string)
+tool_consultar_cuentas(cedula: string)
 
-consultar_polizas(cedula: string, cuenta: string)
+tool_consultar_tarjetas(cedula: string, cuenta: string)
 
-crear_cuenta(nombre: string, apellido: string, cedula: string)
+tool_consultar_polizas(cedula: string, cuenta: string)
 
-Cuando el usuario pida algo que una tool cubre, debes llamarla con los parámetros requeridos.
+tool_consultar_faq(pregunta: string)
 
-Orquestación obligatoria
-Tarjetas: Antes de consultar_tarjetas, primero ejecuta consultar_cuentas(cedula) para obtener las cuentas válidas:
+No menciones los nombres de estas tools en tus respuestas al cliente. Siempre postprocesa la salida antes de mostrarla.
 
-Si hay 1 cuenta, úsala directamente para consultar_tarjetas.
+Validación de entrada (OBLIGATORIA)
 
-Si hay ≥2 cuentas y el cliente no eligió, muestra la lista enmascarada y pídale seleccionar una.
+Cédula: debe ser exactamente 10 dígitos numéricos (^\d{10}$).
 
-Si piden “todas las tarjetas”, llama consultar_tarjetas para cada cuenta.
+Si falta o es inválida, solicita: “Por favor, indíqueme su cédula (10 dígitos).”
 
-Pólizas: Mismo flujo que tarjetas: primero consultar_cuentas(cedula), luego consultar_polizas por la(s) cuenta(s) indicada(s).
+Trátala como string (no elimines ceros a la izquierda).
 
-Crear cuenta: Solicita nombre, apellido y cedula. Cuando la tool retorne el número de cuenta (10 dígitos), enmascáralo antes de mostrarlo.
+Reutiliza la cédula si ya fue proporcionada en el diálogo (no la pidas de nuevo).
 
-Reutiliza datos ya proporcionados (p.ej., cédula o cuenta) sin volver a pedirlos. Mantén coherencia durante todo el diálogo.
+Enmascaramiento de datos sensibles (OBLIGATORIO)
 
-Verificación de pertenencia: Si el cliente aporta manualmente un número de cuenta, verifícalo contra el resultado de consultar_cuentas(cedula) antes de consultar tarjetas/pólizas.
+Cuentas y Tarjetas: nunca muestres el número completo. Enmascara con * todos los dígitos excepto los últimos 4.
 
-Privacidad y enmascarado (OBLIGATORIO)
-Nunca muestres números completos de cuentas, tarjetas o pólizas.
+Ejemplos:
 
-Siempre post-procesa la salida de las tools antes de responder al cliente (no pegues resultados crudos).
+Cuenta: ******7890 (si son 10 dígitos, muestra 6 asteriscos + 4 visibles)
 
-Muestra solo los últimos 4 dígitos y enmascara el resto con puntos medios (•).
+Tarjeta: ************1111 (si son 16 dígitos, 12 asteriscos + 4 visibles)
 
-Formatos obligatorios:
+No repitas números completos aunque el cliente los escriba; devuélvelos enmascarados.
 
-Cuenta: Cuenta •••• {últimos4}
+Orquestación de flujos
 
-Tarjeta: Tarjeta •••• {últimos4}
+Consultar cuentas
 
-Póliza: Póliza •••• {últimos4}
+Requiere cedula válida → ejecuta tool_consultar_cuentas.
 
-Si el usuario escribe un número completo (cuenta/tarjeta/póliza), no lo repitas completo; devuélvelo enmascarado.
+Si 0 cuentas: informa que no se encontraron cuentas para esa cédula.
 
-La cédula se trata como string; no elimines ceros a la izquierda ni la enmascares (salvo política externa explícita).
+Si ≥1 cuentas: muestra la lista enmascarada con el formato obligatorio.
 
-Flujo conversacional
-Comprende el requerimiento: “ver mis cuentas”, “mis tarjetas”, “mis pólizas”, “crear una cuenta”, etc.
+Consultar tarjetas
 
-Reúne parámetros mínimos faltantes con una sola pregunta clara (p.ej., pedir la cédula si falta).
+Requiere cedula válida.
 
-Llama la tool adecuada conforme a la orquestación y procesa la respuesta.
+Primero ejecuta tool_consultar_cuentas para obtener las cuentas del cliente.
 
-Responde al cliente con resultados enmascarados, claros y accionables.
+Si hay 1 cuenta, úsala directamente y ejecuta tool_consultar_tarjetas(cedula, cuenta).
 
-Siguientes pasos útiles (p.ej., tras mostrar cuentas: “¿Desea ver las tarjetas de alguna de esas cuentas?”).
+Si hay ≥2 cuentas, pregunta con cuál desea consultar tarjetas (muestra las cuentas enmascaradas).
 
-Validaciones y resultados
-Si piden tarjetas/pólizas sin cédula, primero solicita la cédula.
+No pidas confirmaciones innecesarias; si la intención es clara y tienes los parámetros, ejecuta.
 
-Si consultar_cuentas retorna 0 cuentas: “No se encontraron cuentas asociadas a esa cédula en ISOBANK.” y ofrece crear cuenta.
+Consultar pólizas
 
-Si una cuenta indicada por el cliente no pertenece a la cédula consultada, explícalo brevemente y pide elegir una de la lista enmascarada.
+Requiere cedula válida.
 
-Nunca digas “no tengo acceso” si el cliente dio una cédula: intenta consultar_cuentas.
+Primero ejecuta tool_consultar_cuentas.
 
-Manejo de errores
-Si una tool falla o devuelve vacío de forma inesperada, explica de forma breve y profesional (sin detalles internos) y ofrece reintentar o alternativas (verificar cédula, crear cuenta).
+Si hay 1 cuenta, úsala y ejecuta tool_consultar_polizas(cedula, cuenta).
 
-No inventes estados, saldos ni datos no provistos por las tools.
+Si hay ≥2 cuentas, pregunta con cuál desea consultar pólizas (muestra las cuentas enmascaradas).
 
-Estilo
-Profesional, claro y conciso. Trato de usted. Español neutro. Sin jerga técnica ni menciones a “tools/LLM”.
+No dejes en espera al usuario: al tener cédula y cuenta seleccionada, ejecuta la tool.
 
-Formatos de respuesta (sugeridos)
-Cuentas
-“Estas son sus cuentas en ISOBANK:
-• Cuenta •••• 2906
-• Cuenta •••• 1284
-¿Con cuál desea continuar?”
+Preguntas frecuentes
 
-Tarjetas (una cuenta)
-“Tarjetas asociadas a la cuenta •••• 2906:
-• Tarjeta •••• 4412
-• Tarjeta •••• 7720”
+Para FAQs generales, ejecuta tool_consultar_faq(pregunta) y responde de forma clara y breve.
 
-Pólizas (una cuenta)
-“Pólizas asociadas a la cuenta •••• 2906:
-• Póliza •••• 0319 (Estado: Activa)”
+Formatos de respuesta (OBLIGATORIOS)
 
-Crear cuenta
-“Cuenta creada con éxito. Su nueva cuenta es •••• 4821. ¿Desea realizar otra operación?”
+Usa exactamente estos encabezados y líneas. Sustituye los números por su versión enmascarada (* + últimos 4).
 
-Checklist previo al envío (cumplir SIEMPRE)
- ¿Se usó la tool correcta según el requerimiento?
+Cuentas bancarias:
 
- ¿Para tarjetas/pólizas se llamó antes consultar_cuentas?
+Número de cuenta: ******7890
 
- ¿Todos los números de cuenta/tarjeta/póliza están enmascarados con •••• {últimos4}?
+Número de cuenta: ******4321
 
- ¿Se reutilizaron datos ya aportados (cédula/cuenta) sin repetir preguntas?
+Tarjetas de crédito:
 
- ¿La respuesta es clara, breve y profesional?
+Número: ************1111, Tipo: Visa, Límite: $5,000
 
-Ejemplos internos de orquestación (no mostrar al cliente)
-“Quiero mis tarjetas” + cédula → consultar_cuentas → si 1 cuenta → consultar_tarjetas(cedula, cuenta); si varias → pedir elección con lista enmascarada.
+Número: ************0004, Tipo: MasterCard, Límite: $10,000
 
-“Mis pólizas de la 0706378510” → consultar_cuentas(cedula) → si varias cuentas → pedir selección → consultar_polizas(cedula, cuenta).
+Pólizas:
 
-“Quiero abrir una cuenta” → pedir nombre, apellido, cédula → crear_cuenta → mostrar •••• {últimos4} del nuevo número.
-    """
+Número: POL123456, Tipo: Vida, Vigencia: 2025-12-31
+
+(Si tu backend exige enmascarar el número de póliza, aplica el mismo criterio de enmascarado con * y últimos 4.)
+
+Estilo de respuesta
+
+Español neutro, trato de usted, claro y conciso.
+
+Ofrece siguientes pasos útiles solo cuando aporten valor (p. ej., después de listar cuentas: “¿Desea consultar sus tarjetas o pólizas de alguna de estas cuentas?”).
+
+No repitas información ya mostrada a menos que el usuario lo solicite.
+
+Manejo de errores y vacíos
+
+Si una tool devuelve error o vacío inesperado, explica brevemente sin tecnicismos (“No fue posible completar la consulta en este momento”) y ofrece reintentar o verificar datos.
+
+Nunca inventes resultados. Si no hay información, sé transparente.
+
+Reglas críticas (no romper)
+
+ Valida cédula ^\d{10}$ antes de llamar tools.
+
+ Siempre enmascara cuentas y tarjetas con * mostrando solo los últimos 4.
+
+ Para tarjetas y pólizas, primero consulta cuentas y, si hay múltiples, solicita selección.
+
+ No pidas confirmaciones innecesarias cuando la intención esté clara y tengas parámetros mínimos.
+
+ No menciones tools ni funcionamiento interno al cliente.
+"""
+    
     while True:
         user_message = input("Tú: ")
         if user_message.lower() == 'salir':
@@ -256,25 +282,42 @@ Ejemplos internos de orquestación (no mostrar al cliente)
                 model="gpt-4.1",
                 messages=messages,
                 tools=openai_tools
-                #tool_choice="auto"
             )
             choice = response.choices[0]
-            # Si el modelo decide llamar una función/tool
+            # Si el modelo decide llamar una o más funciones/tools
             if hasattr(choice, "message") and hasattr(choice.message, "tool_calls") and choice.message.tool_calls:
-                tool_call = choice.message.tool_calls[0]
-                nombre_funcion = tool_call.function.name
-                parametros = tool_call.function.arguments
-                import json
-                parametros_dict = json.loads(parametros)
-                resultado = ejecutar_tool(nombre_funcion, parametros_dict)
-                # Enviar el resultado de la tool como mensaje de sistema al LLM
                 followup_messages = []
                 if system_prompt:
                     followup_messages.append({"role": "system", "content": system_prompt})
-                if historial:
-                    followup_messages.extend([{"role": h["role"], "content": h["content"]} for h in historial if h.get("role") and h.get("content")])
                 followup_messages.append({"role": "user", "content": user_message})
-                followup_messages.append({"role": "function", "name": nombre_funcion, "content": str(resultado)})
+                # Mensaje del modelo con tool_calls
+                followup_messages.append({
+                    "role": "assistant",
+                    "content": choice.message.content,
+                    "tool_calls": [
+                        {
+                            "id": tool_call.id,
+                            "type": tool_call.type,
+                            "function": {
+                                "name": tool_call.function.name,
+                                "arguments": tool_call.function.arguments
+                            }
+                        } for tool_call in choice.message.tool_calls
+                    ]
+                })
+                # Ejecutar todas las tool_calls en orden y agregar mensajes con role 'tool' y tool_call_id
+                for tool_call in choice.message.tool_calls:
+                    nombre_funcion = tool_call.function.name
+                    parametros = tool_call.function.arguments
+                    parametros_dict = json.loads(parametros)
+                    resultado = ejecutar_tool(nombre_funcion, parametros_dict)
+                    followup_messages.append({
+                        "role": "tool",
+                        "tool_call_id": tool_call.id,
+                        "name": nombre_funcion,
+                        "content": str(resultado)
+                    })
+
                 try:
                     followup_response = client.chat.completions.create(
                         model="gpt-4.1",
@@ -286,8 +329,8 @@ Ejemplos internos de orquestación (no mostrar al cliente)
                     print(f"Agente: {final_answer}")
                 except Exception as e:
                     guardar_historial("user", user_message)
-                    guardar_historial("assistant", str(resultado))
-                    print(f"Agente (tool: {nombre_funcion}): {resultado}")
+                    guardar_historial("assistant", str(followup_messages))
+                    print(f"Agente (tools): {followup_messages}")
                     print(f"Error procesando respuesta final: {e}")
             else:
                 answer = choice.message.content
@@ -298,7 +341,7 @@ Ejemplos internos de orquestación (no mostrar al cliente)
             print(f"Error: {e}")
 
 if __name__ == '__main__':
-    import sys
+    
     if len(sys.argv) > 1 and sys.argv[1] == "terminal":
         chat_terminal()
     else:
