@@ -59,7 +59,7 @@ def consultar_polizas():
     cedula = data.get('cedula')
     cuenta = data.get('cuenta')
     #tipo = data.get('tipo')
-    if not (cedula and cuenta and len(cuenta) == 10 and tipo):
+    if not (cedula and cuenta and len(cuenta) == 10):
         return jsonify({'error': 'Datos inválidos'}), 400
     # Simulación de búsqueda de pólizas por tipo
     polizas_cliente = [
